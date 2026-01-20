@@ -41,31 +41,27 @@ model_file = load_model_file()
 img_file = st.camera_input("カメラで撮影")
 
 if img_file is not None:
-    # 1. 画像の読み込みと向きの補正
+    # 1. 画像の準備
     image = Image.open(img_file)
     image = ImageOps.exif_transpose(image)
-    
-    # 2. AI用の画像データ(numpy)を準備
-    # ここを確実に uint8 型にすることで検知漏れを防ぎます
     image_np = np.array(image).astype(np.uint8)
     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_np)
 
-    # 3. オブジェクト検出の設定
+    # 2. 検出器の作成と実行
     base_options = python.BaseOptions(model_asset_path=model_file)
     options = vision.ObjectDetectorOptions(
         base_options=base_options,
         score_threshold=score_threshold,
     )
 
+    # ここからAIの実行
     try:
         with vision.ObjectDetector.create_from_options(options) as detector:
             detection_result = detector.detect(mp_image)
 
-            # 4. 描画処理 (Pillowを使用)
+            # 3. 描画の準備
             draw_image = image.copy()
             draw = ImageDraw.Draw(draw_image)
-            
-            # フォント読み込み (日本語が出ない場合はデフォルト)
             font = ImageFont.load_default()
 
             if detection_result.detections:
@@ -74,3 +70,32 @@ if img_file is not None:
                 for i, detection in enumerate(detection_result.detections):
                     color = colors[i % len(colors)]
                     bbox = detection.bounding_box
+                    
+                    # 枠の計算
+                    left, top = bbox.origin_x, bbox.origin_y
+                    right, bottom = left + bbox.width, top + bbox.height
+                    draw.rectangle([left, top, right, bottom], outline=color, width=5)
+                    
+                    # ラベルの作成
+                    cat = detection.categories[0]
+                    name = LABEL_MAP.get(cat.category_name, cat.category_name)
+                    label = f"{name} {int(cat.score * 100)}%"
+                    
+                    # ラベル背景と文字
+                    draw.rectangle([left, top - 25, left + len(label)*10, top], fill=color)
+                    draw.text((left + 2, top - 22), label, fill="white")
+                
+                st.image(draw_image, use_container_width=True)
+                
+                # レポート表示
+                st.subheader("📊 検出レポート")
+                for detection in detection_result.detections:
+                    cat = detection.categories[0]
+                    disp_name = LABEL_MAP.get(cat.category_name, cat.category_name)
+                    st.write(f"**{disp_name}**")
+                    st.progress(float(cat.score))
+            else:
+                st.image(image, use_container_width=True)
+                st.warning("検知されませんでした。")
+
+    except Exception as e:

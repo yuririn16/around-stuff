@@ -58,4 +58,16 @@ if img_file is not None:
             if res.detections:
                 for i, det in enumerate(res.detections):
                     box = det.bounding_box
-                    x, y, w, h = box.origin_x, box.origin_y, box.width,
+                    # --- ここが修正箇所です ---
+                    x, y, w, h = box.origin_x, box.origin_y, box.width, box.height
+                    
+                    # 枠を描く
+                    draw.rectangle([x, y, x + w, y + h], outline="#00FF00", width=5)
+                    
+                    # ラベル
+                    cat = det.categories[0]
+                    name = LABEL_MAP.get(cat.category_name, cat.category_name)
+                    label = f"{name} {int(cat.score * 100)}%"
+                    
+                    # 文字背景と文字
+                    draw.rectangle([x, y

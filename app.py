@@ -19,7 +19,7 @@ LABEL_MAP = {
 }
 
 st.set_page_config(page_title="AI物体検出", layout="centered")
-st.title("🚀 AI物体検出カメラ")
+st.title("🎨 カラー別・AI物体検出カメラ")
 
 # 1. モデル準備
 model_path = "model.tflite"
@@ -42,59 +42,5 @@ if img_file is not None:
     image_np = np.array(image).astype(np.uint8)
     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_np)
 
-    # AI設定
     options = vision.ObjectDetectorOptions(
-        base_options=python.BaseOptions(model_asset_path=model_file),
-        score_threshold=0.3
-    )
-
-    # 3. 実行
-    try:
-        with vision.ObjectDetector.create_from_options(options) as detector:
-            res = detector.detect(mp_image)
-            draw_img = image.copy()
-            draw = ImageDraw.Draw(draw_img)
-            
-            if res.detections:
-                for i, det in enumerate(res.detections):
-                    # 枠の座標
-                    box = det.bounding_box
-                    x = box.origin_x
-                    y = box.origin_y
-                    w = box.width
-                    h = box.height
-                    
-                    # 枠を描画
-                    draw.rectangle([x, y, x + w, y + h], outline="#00FF00", width=5)
-                    
-                    # ラベル作成
-                    cat = det.categories[0]
-                    name = LABEL_MAP.get(cat.category_name, cat.category_name)
-                    score = int(cat.score * 100)
-                    txt = f"{name} {score}%"
-                    
-                    # ラベルの背景（読みやすくするため）
-                    # 座標を計算してから描画
-                    bg_x1 = x
-                    bg_y1 = y - 30
-                    bg_x2 = x + (len(txt) * 16)
-                    bg_y2 = y
-                    draw.rectangle([bg_x1, bg_y1, bg_x2, bg_y2], fill="#00FF00")
-                    
-                    # 文字を描画
-                    draw.text((x + 5, y - 25), txt, fill="white")
-                
-                st.image(draw_img, use_container_width=True)
-                
-                # レポート
-                st.subheader("📊 検出レポート")
-                for det in res.detections:
-                    c = det.categories[0]
-                    n = LABEL_MAP.get(c.category_name, c.category_name)
-                    st.write(f"**{n}** ({int(c.score*100)}%)")
-                    st.progress(float(c.score))
-            else:
-                st.image(image, use_container_width=True)
-                st.warning("何も見つかりませんでした。")
-    except Exception as e:
-        st.error(f"エラーが発生しました: {e}")
+        base_options=python.BaseOptions(model_asset_

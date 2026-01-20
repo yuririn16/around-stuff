@@ -10,7 +10,7 @@ import os
 
 st.title("物体検出カメラ（リスト表示版）")
 
-# 1. モデルファイルの準備
+# 1. モデル準備
 model_path = "model.tflite"
 model_url = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite"
 
@@ -24,7 +24,7 @@ def load_model_file():
 try:
     model_file = load_model_file()
 except Exception as e:
-    st.error(f"モデルのダウンロードに失敗しました: {e}")
+    st.error(f"モデルの準備エラー: {e}")
 
 # 2. カメラ入力
 img_file = st.camera_input("写真を撮る")
@@ -34,6 +34,7 @@ if img_file is not None:
     image = ImageOps.exif_transpose(image)
     image_np = np.array(image).astype(np.uint8)
     
+    # 描画用画像の作成
     output_image = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_np)
 
@@ -41,27 +42,52 @@ if img_file is not None:
     base_options = python.BaseOptions(model_asset_path=model_file)
     options = vision.ObjectDetectorOptions(
         base_options=base_options,
-        score_threshold=0.2, 
-        max_results=10        # リスト化するので少し多めに表示可能に
+        score_threshold=0.2,
+        max_results=10
     )
 
-    # 4. 実行と結果表示
+    # 4. 実行と表示
     try:
         with vision.ObjectDetector.create_from_options(options) as detector:
-            detection_result = detector.detect(mp_image)
+            result = detector.detect(mp_image)
 
-            if detection_result.detections:
-                # 枠線の色リスト
-                colors = [(0, 255, 0), (255, 0, 0), (0, 0, 255), (0, 255, 255), (255, 0, 255)]
-                
-                # 見つかった物体の名前を保存するリスト
-                found_labels = []
-                
-                for i, detection in enumerate(detection_result.detections):
+            if result.detections:
+                colors = [(0, 255, 0), (255, 0, 0), (0, 0, 255), (0, 255, 255)]
+                # リスト用のデータを溜める変数
+                found_items = []
+
+                for i, detection in enumerate(result.detections):
+                    # 枠とラベルの描画
                     color = colors[i % len(colors)]
-                    bbox = detection.bounding_box
-                    x, y, w, h = int(bbox.origin_x), int(bbox.origin_y), int(bbox.width), int(bbox.height)
-                    
-                    # 枠とラベルを画像に描画
+                    box = detection.bounding_box
+                    x, y, w, h = int(box.origin_x), int(box.origin_y), int(box.width), int(box.height)
                     cv2.rectangle(output_image, (x, y), (x + w, y + h), color, 3)
-                    category = detection.categories[0]
+                    
+                    cat = detection.categories[0]
+                    label = f"{cat.category_name} {int(cat.score*100)}%"
+                    cv2.putText(output_image, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+                    
+                    # --- リスト表示用にデータを追加 ---
+                    found_items.append({
+                        "name": cat.category_name,
+                        "score": int(cat.score * 100)
+                    })
+
+                # 加工した画像の表示
+                final_img = cv2.cvtColor(output_image, cv2.COLOR_BGR2RGB)
+                st.image(final_img, caption="検出成功", use_container_width=True)
+
+                # --- 画面下部のリスト表示 ---
+                st.write("---")
+                st.subheader("📋 検出された物体のリスト")
+                for item in found_items:
+                    st.write(f"✅ **{item['name']}** (確信度: {item['score']}%)")
+                
+                st.success(f"合計 {len(found_items)} 個の物体が見つかりました")
+
+            else:
+                st.image(image_np, caption="何も見つかりませんでした")
+                st.info("明るい場所で撮り直してみてください。")
+
+    except Exception as e:
+        st.error(f"AI実行エラー: {e}")

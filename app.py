@@ -1,36 +1,55 @@
 import streamlit as st
 import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
 import numpy as np
 from PIL import Image
+import urllib.request
 
-# 1. オブジェクト検出の準備
-mp_object_detection = mp.solutions.object_detection
-mp_drawing = mp.solutions.drawing_utils
+st.title("物体検出（最新版API）練習中")
 
-st.title("物体検出（Object Detection）練習中")
-st.write("身の回りのものを撮ってみよう（スマホ、キーボード、コップなど）")
+# 1. AIモデル（学習済みデータ）をダウンロードする設定
+# 初回起動時にGoogleのサーバーからモデルを読み込みます
+model_url = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite"
+model_path = "model.tflite"
 
+@st.cache_resource
+def load_model():
+    urllib.request.urlretrieve(model_url, model_path)
+    return model_path
+
+model_file = load_model()
+
+# 2. カメラ入力
 img_file = st.camera_input("写真を撮る")
 
 if img_file is not None:
     image = Image.open(img_file)
     image_np = np.array(image)
+    
+    # MediaPipe用の画像形式に変換
+    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_np)
 
-    # 2. オブジェクト検出AIを起動
-    # model_selection=0 は近距離（2m以内）、1は遠距離（5m以内）
-    with mp_object_detection.ObjectDetection(model_selection=0, min_detection_confidence=0.5) as object_detection:
-        results = object_detection.process(image_np)
+    # 3. オブジェクト検出の設定
+    options = vision.ObjectDetectorOptions(
+        base_options=python.BaseOptions(model_asset_path=model_file),
+        score_threshold=0.5, # 50%以上の自信があるものだけ表示
+    )
 
-        # 3. 見つけた物体に枠と名前を描く
-        if results.detections:
-            for detection in results.detections:
-                # 枠を描く
-                mp_drawing.draw_detection(image_np, detection)
+    # 4. 検出実行
+    with vision.ObjectDetector.create_from_options(options) as detector:
+        detection_result = detector.detect(mp_image)
+
+        # 5. 結果の表示
+        if detection_result.detections:
+            for detection in detection_result.detections:
+                # 見つけた物の名前を取得
+                category = detection.categories[0]
+                label = category.category_name
+                score = category.score
                 
-                # 物体の名前（ラベル）を取得して表示
-                label = detection.label_id[0] # 本来はIDから名前を引きますが、練習用にIDを表示
-                st.write(f"何かを見つけました！ (検出スコア: {int(detection.score[0]*100)}%)")
-
-            st.image(image_np, caption="検出結果", use_container_width=True)
+                st.write(f"✅ **{label}** を発見！ (確信度: {int(score*100)}%)")
+            
+            st.image(image_np, caption="撮影した画像")
         else:
-            st.warning("何も見つかりませんでした。もっと近づけてみてください。")
+            st.warning("何も見つかりませんでした。")

@@ -7,19 +7,15 @@ from PIL import Image, ImageOps, ImageDraw
 import urllib.request
 import os
 
-# 日本語辞書
+# 日本語ラベル辞書
 LABEL_MAP = {
     "person": "人間", "bicycle": "自転車", "car": "車", "motorcycle": "バイク",
-    "airplane": "飛行機", "bus": "バス", "train": "電車", "truck": "トラック",
-    "bottle": "ボトル", "wine glass": "グラス", "cup": "コップ", "fork": "フォーク",
-    "knife": "ナイフ", "spoon": "スプーン", "bowl": "ボウル", "banana": "バナナ",
-    "apple": "りんご", "chair": "椅子", "couch": "ソファ", "potted plant": "観葉植物",
-    "tv": "テレビ", "laptop": "PC", "mouse": "マウス", "remote": "リモコン",
-    "keyboard": "キーボード", "cell phone": "スマホ", "book": "本", "clock": "時計"
+    "bottle": "ボトル", "cup": "コップ", "chair": "椅子", "tv": "テレビ",
+    "laptop": "PC", "mouse": "マウス", "keyboard": "キーボード", "cell phone": "スマホ"
 }
 
-st.set_page_config(page_title="AI物体検出", layout="centered")
-st.title("🎨 カラー別・AI物体検出カメラ")
+st.set_page_config(page_title="AIカメラ", layout="centered")
+st.title("🎨 カラー別・AI物体検出")
 
 # 1. モデル準備
 model_path = "model.tflite"
@@ -31,16 +27,22 @@ def load_model_file():
         urllib.request.urlretrieve(model_url, model_path)
     return model_path
 
-model_file = load_model_file()
+try:
+    m_file = load_model_file()
+except:
+    st.error("モデルの読み込みに失敗しました")
 
 # 2. カメラ入力
-img_file = st.camera_input("カメラで撮影")
+img_file = st.camera_input("撮影する")
 
 if img_file is not None:
-    image = Image.open(img_file)
-    image = ImageOps.exif_transpose(image)
-    image_np = np.array(image).astype(np.uint8)
-    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_np)
+    # 画像準備
+    img = Image.open(img_file)
+    img = ImageOps.exif_transpose(img)
+    img_np = np.array(img).astype(np.uint8)
+    mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_np)
 
+    # 3. AIの設定 (行を短く分割してエラー防止)
+    base_ops = python.BaseOptions(model_asset_path=m_file)
     options = vision.ObjectDetectorOptions(
-        base_options=python.BaseOptions(model_asset_
+        base_options

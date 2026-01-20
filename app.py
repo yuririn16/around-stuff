@@ -73,4 +73,8 @@ if img_file is not None:
                 final_image = cv2.cvtColor(output_image, cv2.COLOR_BGR2RGB)
                 st.image(final_image, caption="検出成功", use_container_width=True)
             else:
-                st.image(image_np, caption="スキャンしましたが何も見つかりませんでした
+                st.image(image_np, caption="スキャンしましたが何も見つかりませんでした")
+                st.info("ヒント: コップやキーボードなど、はっきりした物を明るい場所で撮ってください。")
+                
+    except Exception as e:
+        st.error(f"AIの実行中にエラーが発生しました: {e}")

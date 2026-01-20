@@ -3,13 +3,13 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 import urllib.request
-import cv2  # 枠を描くために使用
+import cv2
 
-st.title("物体検出カメラ（枠線表示版）")
+st.title("物体検出カメラ（修正版）")
 
-# 1. AIモデルの準備
+# 1. AIモデルの準備（キャッシュして高速化）
 model_url = "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite"
 model_path = "model.tflite"
 
@@ -24,18 +24,23 @@ model_file = load_model()
 img_file = st.camera_input("写真を撮る")
 
 if img_file is not None:
+    # --- 修正ポイント1: 画像の向きを正す ---
     image = Image.open(img_file)
-    # OpenCVで加工するためにコピーを作成
-    image_np = np.array(image)
-    # 表示用（枠を描き込む用）の画像
-    output_image = image_np.copy()
+    image = ImageOps.exif_transpose(image) # スマホ特有の回転情報を補正
     
+    image_np = np.array(image)
+    
+    # --- 修正ポイント2: 色の並びを変換 (RGB -> BGR) ---
+    # OpenCVはBGRで描画するため、一度変換してコピーを作成
+    output_image = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+    
+    # MediaPipe用の画像を作成
     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_np)
 
     # 3. オブジェクト検出の設定
     options = vision.ObjectDetectorOptions(
         base_options=python.BaseOptions(model_asset_path=model_file),
-        score_threshold=0.5,
+        score_threshold=0.3, # 閾値を少し下げて検知しやすくします (0.5 -> 0.3)
     )
 
     # 4. 検出実行
@@ -45,20 +50,25 @@ if img_file is not None:
         # 5. 結果の描画
         if detection_result.detections:
             for detection in detection_result.detections:
-                # --- A. 座標の取得 ---
                 bbox = detection.bounding_box
+                # 座標計算
                 start_point = (int(bbox.origin_x), int(bbox.origin_y))
                 end_point = (int(bbox.origin_x + bbox.width), int(bbox.origin_y + bbox.height))
 
-                # --- B. 枠を描く (緑色の線、太さ3) ---
-                cv2.rectangle(output_image, start_point, end_point, (0, 255, 0), 3)
+                # 枠を描く (BGRなので (0, 255, 0) は緑)
+                cv2.rectangle(output_image, start_point, end_point, (0, 255, 0), 5)
 
-                # --- C. 名前とスコアの取得 ---
+                # ラベル
                 category = detection.categories[0]
                 label_text = f"{category.category_name}: {int(category.score*100)}%"
-
-                # --- D. ラベルを画像に書き込む ---
                 cv2.putText(output_image, label_text, (start_point[0], start_point[1] - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
             
-            # 最終的な画像
+            # --- 修正ポイント3: 表示用にRGBに戻す ---
+            final_image = cv2.cvtColor(output_image, cv2.COLOR_BGR2RGB)
+            st.image(final_image, caption="検出成功！", use_container_width=True)
+            st.success(f"{len(detection_result.detections)} 個見つかりました")
+        else:
+            # 失敗した場合は元の画像を表示
+            st.image(image_np, caption="何も見つかりませんでした")
+            st.warning("検知されませんでした。もっと明るい場所で、対象を中央に映してみてください。")

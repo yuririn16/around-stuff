@@ -42,8 +42,8 @@ if img_file is not None:
     base_options = python.BaseOptions(model_asset_path=model_file)
     options = vision.ObjectDetectorOptions(
         base_options=base_options,
-        score_threshold=0.2,
-        max_results=10
+        score_threshold=0.4,
+        max_results=20
     )
 
     # 4. 実行と表示
